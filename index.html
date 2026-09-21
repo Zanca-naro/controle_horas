@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle de Horas</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1a1d23;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --positive: #16a34a;
+    --negative: #dc2626;
+    --danger: #dc2626;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a;
+      --card: #1e2127;
+      --text: #f2f3f5;
+      --text-muted: #9aa0aa;
+      --border: #2c2f36;
+      --accent: #3b82f6;
+      --accent-text: #ffffff;
+      --positive: #4ade80;
+      --negative: #f87171;
+      --danger: #f87171;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a;
+    --card: #1e2127;
+    --text: #f2f3f5;
+    --text-muted: #9aa0aa;
+    --border: #2c2f36;
+    --accent: #3b82f6;
+    --accent-text: #ffffff;
+    --positive: #4ade80;
+    --negative: #f87171;
+    --danger: #f87171;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 1.3rem; margin: 8px 0 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .clock-status { text-align: center; }
+  .clock-status .time { font-size: 2rem; font-weight: 700; margin: 6px 0; }
+  .clock-status .sub { color: var(--text-muted); font-size: 0.85rem; }
+  button {
+    font: inherit;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-text); width: 100%; font-weight: 600; font-size: 1rem; }
+  .btn-stop { background: var(--negative); color: #fff; width: 100%; font-weight: 600; font-size: 1rem; }
+  .btn-ghost { background: transparent; color: var(--accent); padding: 6px 8px; font-size: 0.85rem; }
+  .btn-danger { background: transparent; color: var(--danger); padding: 6px 8px; font-size: 0.85rem; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .summary-grid .box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
+  .summary-grid .box .label { color: var(--text-muted); font-size: 0.75rem; }
+  .summary-grid .box .val { font-size: 1.25rem; font-weight: 700; margin-top: 2px; }
+  .pos { color: var(--positive); }
+  .neg { color: var(--negative); }
+  form.manual { display: flex; flex-direction: column; gap: 8px; }
+  form.manual label { font-size: 0.78rem; color: var(--text-muted); }
+  form.manual input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .row > label { flex: 1; }
+  .row .remove-row { flex: 0 0 auto; padding: 10px 12px; }
+  .day-group { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .day-group:last-child { border-bottom: none; }
+  .day-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .day-head .date { font-weight: 700; font-size: 0.95rem; }
+  .day-head .target { font-size: 0.72rem; color: var(--text-muted); }
+  .day-head .diff { font-weight: 700; white-space: nowrap; }
+  .session { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 4px 4px; font-size: 0.85rem; }
+  .session .hours { color: var(--text-muted); }
+  .empty { color: var(--text-muted); text-align: center; padding: 20px 0; font-size: 0.9rem; }
+  h2 { font-size: 0.95rem; margin: 0 0 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .sync-status { font-size: 0.8rem; margin-top: 8px; }
+  .sync-status.ok { color: var(--positive); }
+  .sync-status.err { color: var(--negative); }
+  .sync-status.idle { color: var(--text-muted); }
+  .hint { font-size: 0.72rem; color: var(--text-muted); margin: -2px 0 4px; }
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row > button { flex: 1; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .user-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .user-bar .who { font-size: 0.85rem; color: var(--text-muted); }
+  .error-msg { color: var(--negative); font-size: 0.82rem; margin-top: 4px; min-height: 1em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⏱️ Controle de Horas</h1>
+
+  <!-- TELA 1: configurar conexão com o GitHub -->
+  <div class="screen active" id="screenGh">
+    <div class="card">
+      <h2>Conectar ao GitHub</h2>
+      <div class="hint">Isso precisa ser feito uma vez em cada dispositivo/navegador. Funciona quando a página está hospedada fora do claude.ai (ex: GitHub Pages).</div>
+      <form class="manual" id="ghForm">
+        <label>Usuário/organização
+          <input type="text" id="ghOwner" placeholder="ex: zancanaro" required>
+        </label>
+        <label>Repositório
+          <input type="text" id="ghRepo" placeholder="ex: controle-horas" required>
+        </label>
+        <div class="row">
+          <label>Arquivo de dados
+            <input type="text" id="ghPath" placeholder="dados.json" value="dados.json" required>
+          </label>
+          <label>Branch
+            <input type="text" id="ghBranch" placeholder="main" value="main" required>
+          </label>
+        </div>
+        <label>Token de acesso pessoal (Personal Access Token)
+          <input type="password" id="ghToken" placeholder="ghp_..." required>
+        </label>
+        <button class="btn-primary" type="submit">Conectar</button>
+      </form>
+      <div class="error-msg" id="ghError"></div>
+      <div class="sync-status idle" id="syncStatus"></div>
+    </div>
+  </div>
+
+  <!-- TELA 2: login / cadastro de usuário do app -->
+  <div class="screen" id="screenAuth">
+    <div class="card">
+      <h2>Entrar</h2>
+      <form class="manual" id="authForm">
+        <label>Usuário
+          <input type="text" id="authUser" autocomplete="username" required>
+        </label>
+        <label>Senha
+          <input type="password" id="authPass" autocomplete="current-password" required>
+        </label>
+        <div class="btn-row">
+          <button class="btn-primary" type="submit" id="loginBtn">Entrar</button>
+          <button class="btn-ghost" type="button" id="registerBtn">Criar conta</button>
+        </div>
+      </form>
+      <div class="error-msg" id="authError"></div>
+      <button class="btn-ghost" type="button" id="changeGhBtn" style="margin-top:8px;">Trocar conexão do GitHub</button>
+    </div>
+  </div>
+
+  <!-- TELA 3: app principal -->
+  <div class="screen" id="screenApp">
+    <div class="user-bar">
+      <div class="who">Logado como <strong id="whoAmI"></strong></div>
+      <button class="btn-ghost" id="logoutBtn">Sair</button>
+    </div>
+
+    <div class="card clock-status">
+      <div class="sub" id="statusLabel">Você não está no ponto</div>
+      <div class="time" id="liveTime">00:00:00</div>
+      <button class="btn-primary" id="clockBtn">Bater ponto (entrada)</button>
+    </div>
+
+    <div class="card">
+      <h2>Resumo</h2>
+      <div class="summary-grid">
+        <div class="box">
+          <div class="label">Hoje</div>
+          <div class="val" id="todayVal">0h00</div>
+        </div>
+        <div class="box">
+          <div class="label">Esta semana</div>
+          <div class="val" id="weekVal">0h00</div>
+        </div>
+        <div class="box">
+          <div class="label">Banco de horas (total)</div>
+          <div class="val" id="bankVal">0h00</div>
+        </div>
+        <div class="box">
+          <div class="label">Extra esta semana</div>
+          <div class="val" id="weekExtraVal">0h00</div>
+        </div>
+      </div>
+      <div class="sync-status idle" id="appSyncStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Adicionar manualmente</h2>
+      <form class="manual" id="manualForm">
+        <label>Data
+          <input type="date" id="mDate" required>
+        </label>
+        <div id="sessionRows"></div>
+        <button type="button" class="btn-ghost" id="addRowBtn" style="align-self:flex-start;">+ Adicionar outro horário</button>
+        <button class="btn-primary" type="submit">Adicionar registro(s)</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Histórico</h2>
+      <div id="entriesList"><div class="empty">Nenhum registro ainda</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== armazenamento local (cache offline) ===================== */
+const GH_CONFIG_KEY = 'controleHoras_ghConfig';
+const CACHE_KEY = 'controleHoras_cache';
+const LAST_USER_KEY = 'controleHoras_lastUser';
+
+function loadGhConfig() {
+  try { const r = localStorage.getItem(GH_CONFIG_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; }
+}
+function saveGhConfig(cfg) { try { localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {} }
+function ghConfigured(cfg) { return !!(cfg && cfg.owner && cfg.repo && cfg.path && cfg.branch && cfg.token); }
+
+function loadCache() {
+  try { const r = localStorage.getItem(CACHE_KEY); return r ? JSON.parse(r) : { users: {} }; } catch (e) { return { users: {} }; }
+}
+function saveCache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify(remoteData)); } catch (e) {} }
+
+/* ===================== base64 seguro pra UTF-8 ===================== */
+function toBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+}
+function fromBase64(b64) {
+  const bin = atob(b64.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+/* ===================== hash de senha (SHA-256 + salt) ===================== */
+function randomSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function hashPassword(password, saltHex) {
+  const data = new TextEncoder().encode(saltHex + ':' + password);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* ===================== GitHub API ===================== */
+let ghConfig = loadGhConfig();
+let ghSha = null;
+let remoteData = loadCache();
+let currentUser = null;
+
+function ghUrl(cfg) {
+  return `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(cfg.path)}`;
+}
+
+async function ghFetchRemote() {
+  if (!ghConfigured(ghConfig)) throw new Error('GitHub não configurado');
+  const res = await fetch(`${ghUrl(ghConfig)}?ref=${encodeURIComponent(ghConfig.branch)}`, {
+    headers: { Authorization: `Bearer ${ghConfig.token}`, Accept: 'application/vnd.github+json' }
+  });
+  if (res.status === 404) return { data: { users: {} }, sha: null };
+  if (!res.ok) throw new Error(`GitHub respondeu ${res.status}`);
+  const json = await res.json();
+  let data;
+  try { data = JSON.parse(fromBase64(json.content)); } catch (e) { data = { users: {} }; }
+  if (!data.users) data.users = {};
+  return { data, sha: json.sha };
+}
+
+// Sempre busca a versão mais recente, funde só a seção do usuário atual, e grava de volta.
+async function ghSaveCurrentUser(retry = true) {
+  if (!ghConfigured(ghConfig) || !currentUser) return;
+  const fresh = await ghFetchRemote();
+  const merged = { users: { ...fresh.data.users } };
+  merged.users[currentUser] = remoteData.users[currentUser];
+  remoteData = merged;
+  saveCache();
+  const body = {
+    message: `Atualiza horas de ${currentUser}`,
+    content: toBase64(JSON.stringify(merged, null, 2)),
+    branch: ghConfig.branch
+  };
+  if (fresh.sha) body.sha = fresh.sha;
+  const res = await fetch(ghUrl(ghConfig), {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ghConfig.token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res.status === 409 && retry) return ghSaveCurrentUser(false);
+  if (!res.ok) throw new Error(`GitHub respondeu ${res.status} ao salvar`);
+  const json = await res.json();
+  ghSha = json.content.sha;
+}
+
+/* ===================== utilidades de data/hora ===================== */
+function pad(n) { return n.toString().padStart(2, '0'); }
+function fmtHM(hoursDecimal) {
+  const sign = hoursDecimal < 0 ? '-' : '';
+  const abs = Math.abs(hoursDecimal);
+  const h = Math.floor(abs);
+  const m = Math.round((abs - h) * 60);
+  return `${sign}${h}h${pad(m)}`;
+}
+function todayStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function timeStr(d = new Date()) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function startOfWeek(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  date.setDate(date.getDate() - day);
+  date.setHours(0,0,0,0);
+  return date;
+}
+function durationHours(start, end) {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let mins = (eh*60+em) - (sh*60+sm);
+  if (mins < 0) mins += 24*60;
+  return mins / 60;
+}
+// Jornada: seg a qui 8:00–16:50 (8h50), sex 8:00–16:00 (8h), sáb/dom sem jornada
+function dailyTarget(dateStr) {
+  const dt = new Date(dateStr + 'T00:00:00');
+  const day = dt.getDay();
+  if (day >= 1 && day <= 4) return 8 + 50/60;
+  if (day === 5) return 8;
+  return 0;
+}
+
+/* ===================== estado do usuário logado ===================== */
+let entries = [];
+let openEntry = null;
+
+function pushLocalToRemote() {
+  if (!currentUser) return;
+  const existing = remoteData.users[currentUser] || {};
+  remoteData.users[currentUser] = { ...existing, entries, openEntry };
+  saveCache();
+}
+
+let syncTimer = null;
+function setAppSyncStatus(text, cls) {
+  const el = document.getElementById('appSyncStatus');
+  if (el) { el.textContent = text; el.className = 'sync-status ' + cls; }
+}
+function scheduleSync() {
+  pushLocalToRemote();
+  setAppSyncStatus('Sincronizando...', 'idle');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      await ghSaveCurrentUser();
+      setAppSyncStatus('Sincronizado com o GitHub ✓', 'ok');
+    } catch (e) {
+      setAppSyncStatus('Erro ao sincronizar: ' + e.message, 'err');
+    }
+  }, 600);
+}
+
+/* ===================== elementos e telas ===================== */
+const screenGh = document.getElementById('screenGh');
+const screenAuth = document.getElementById('screenAuth');
+const screenApp = document.getElementById('screenApp');
+function showScreen(el) {
+  [screenGh, screenAuth, screenApp].forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+const clockBtn = document.getElementById('clockBtn');
+const statusLabel = document.getElementById('statusLabel');
+const liveTime = document.getElementById('liveTime');
+const entriesList = document.getElementById('entriesList');
+const manualForm = document.getElementById('manualForm');
+const sessionRows = document.getElementById('sessionRows');
+const addRowBtn = document.getElementById('addRowBtn');
+let rowCounter = 0;
+
+document.getElementById('mDate').value = todayStr();
+
+function addSessionRow() {
+  rowCounter += 1;
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <label>Entrada<input type="time" class="mStart" required></label>
+    <label>Saída<input type="time" class="mEnd" required></label>
+    <button type="button" class="btn-danger remove-row">✕</button>
+  `;
+  row.querySelector('.remove-row').addEventListener('click', () => {
+    if (sessionRows.children.length > 1) row.remove();
+  });
+  sessionRows.appendChild(row);
+}
+addRowBtn.addEventListener('click', addSessionRow);
+addSessionRow();
+
+function render() {
+  document.getElementById('whoAmI').textContent = currentUser || '';
+
+  if (openEntry) {
+    statusLabel.textContent = `No ponto desde ${openEntry.start} (${openEntry.date})`;
+    clockBtn.textContent = 'Bater ponto (saída)';
+    clockBtn.className = 'btn-stop';
+  } else {
+    statusLabel.textContent = 'Você não está no ponto';
+    clockBtn.textContent = 'Bater ponto (entrada)';
+    clockBtn.className = 'btn-primary';
+  }
+
+  const byDate = {};
+  entries.forEach(e => { byDate[e.date] = (byDate[e.date] || 0) + durationHours(e.start, e.end); });
+
+  const today = todayStr();
+  const todayHours = byDate[today] || 0;
+  document.getElementById('todayVal').textContent = `${fmtHM(todayHours)} / ${fmtHM(dailyTarget(today))}`;
+
+  const weekStart = startOfWeek(new Date());
+  let weekHours = 0, weekTarget = 0;
+  Object.keys(byDate).forEach(d => {
+    const dt = new Date(d + 'T00:00:00');
+    if (dt >= weekStart) { weekHours += byDate[d]; weekTarget += dailyTarget(d); }
+  });
+  document.getElementById('weekVal').textContent = fmtHM(weekHours);
+
+  const weekExtra = weekHours - weekTarget;
+  const weekExtraEl = document.getElementById('weekExtraVal');
+  weekExtraEl.textContent = fmtHM(weekExtra);
+  weekExtraEl.className = 'val ' + (weekExtra >= 0 ? 'pos' : 'neg');
+
+  let bank = 0;
+  Object.keys(byDate).forEach(d => { bank += byDate[d] - dailyTarget(d); });
+  const bankEl = document.getElementById('bankVal');
+  bankEl.textContent = fmtHM(bank);
+  bankEl.className = 'val ' + (bank >= 0 ? 'pos' : 'neg');
+
+  if (entries.length === 0) {
+    entriesList.innerHTML = '<div class="empty">Nenhum registro ainda</div>';
+  } else {
+    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+    entriesList.innerHTML = dates.map(d => {
+      const dayTotal = byDate[d];
+      const target = dailyTarget(d);
+      const diff = dayTotal - target;
+      const sessions = entries.filter(e => e.date === d).sort((a, b) => a.start.localeCompare(b.start));
+      const sessionsHtml = sessions.map(e => {
+        const h = durationHours(e.start, e.end);
+        return `<div class="session">
+          <span>${e.start} – ${e.end}</span>
+          <span class="hours">${fmtHM(h)}</span>
+          <button class="btn-danger" data-id="${e.id}">Excluir</button>
+        </div>`;
+      }).join('');
+      return `<div class="day-group">
+        <div class="day-head">
+          <div>
+            <div class="date">${d}</div>
+            <div class="target">meta: ${fmtHM(target)} · trabalhado: ${fmtHM(dayTotal)}</div>
+          </div>
+          <div class="diff ${diff >= 0 ? 'pos' : 'neg'}">${fmtHM(diff)}</div>
+        </div>
+        ${sessionsHtml}
+      </div>`;
+    }).join('');
+    entriesList.querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        entries = entries.filter(e => e.id !== btn.dataset.id);
+        scheduleSync();
+        render();
+      });
+    });
+  }
+}
+
+clockBtn.addEventListener('click', () => {
+  const now = new Date();
+  if (openEntry) {
+    entries.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: openEntry.date, start: openEntry.start, end: timeStr(now) });
+    openEntry = null;
+  } else {
+    openEntry = { date: todayStr(now), start: timeStr(now) };
+  }
+  scheduleSync();
+  render();
+});
+
+manualForm.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const date = document.getElementById('mDate').value;
+  if (!date) return;
+  const rows = [...sessionRows.querySelectorAll('.row')];
+  let added = 0;
+  rows.forEach(row => {
+    const start = row.querySelector('.mStart').value;
+    const end = row.querySelector('.mEnd').value;
+    if (!start || !end) return;
+    entries.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2,6) + added, date, start, end });
+    added += 1;
+  });
+  if (added === 0) return;
+  scheduleSync();
+  render();
+  manualForm.reset();
+  document.getElementById('mDate').value = todayStr();
+  sessionRows.innerHTML = '';
+  addSessionRow();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  currentUser = null;
+  entries = [];
+  openEntry = null;
+  document.getElementById('authPass').value = '';
+  document.getElementById('authError').textContent = '';
+  showScreen(screenAuth);
+});
+
+/* ===================== tela 1: conectar ao GitHub ===================== */
+const ghForm = document.getElementById('ghForm');
+if (ghConfig) {
+  document.getElementById('ghOwner').value = ghConfig.owner || '';
+  document.getElementById('ghRepo').value = ghConfig.repo || '';
+  document.getElementById('ghPath').value = ghConfig.path || 'dados.json';
+  document.getElementById('ghBranch').value = ghConfig.branch || 'main';
+  document.getElementById('ghToken').value = ghConfig.token || '';
+}
+
+async function connectGithub() {
+  const el = document.getElementById('syncStatus');
+  const errEl = document.getElementById('ghError');
+  errEl.textContent = '';
+  el.textContent = 'Conectando...';
+  el.className = 'sync-status idle';
+  try {
+    const fresh = await ghFetchRemote();
+    remoteData = fresh.data;
+    ghSha = fresh.sha;
+    saveCache();
+    el.textContent = 'Conectado ✓';
+    el.className = 'sync-status ok';
+    const lastUser = localStorage.getItem(LAST_USER_KEY);
+    if (lastUser) document.getElementById('authUser').value = lastUser;
+    showScreen(screenAuth);
+  } catch (e) {
+    errEl.textContent = 'Não foi possível conectar: ' + e.message;
+    el.textContent = '';
+  }
+}
+
+ghForm.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  ghConfig = {
+    owner: document.getElementById('ghOwner').value.trim(),
+    repo: document.getElementById('ghRepo').value.trim(),
+    path: document.getElementById('ghPath').value.trim() || 'dados.json',
+    branch: document.getElementById('ghBranch').value.trim() || 'main',
+    token: document.getElementById('ghToken').value.trim()
+  };
+  saveGhConfig(ghConfig);
+  connectGithub();
+});
+
+document.getElementById('changeGhBtn').addEventListener('click', () => {
+  showScreen(screenGh);
+});
+
+/* ===================== tela 2: login / cadastro ===================== */
+const authForm = document.getElementById('authForm');
+const authError = document.getElementById('authError');
+
+authForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  authError.textContent = '';
+  const username = document.getElementById('authUser').value.trim();
+  const password = document.getElementById('authPass').value;
+  if (!username || !password) return;
+  try {
+    const fresh = await ghFetchRemote();
+    remoteData = fresh.data;
+    ghSha = fresh.sha;
+    saveCache();
+    const user = remoteData.users[username];
+    if (!user) { authError.textContent = 'Usuário não encontrado.'; return; }
+    const hash = await hashPassword(password, user.salt);
+    if (hash !== user.hash) { authError.textContent = 'Senha incorreta.'; return; }
+    currentUser = username;
+    entries = user.entries || [];
+    openEntry = user.openEntry || null;
+    localStorage.setItem(LAST_USER_KEY, username);
+    document.getElementById('authPass').value = '';
+    render();
+    setAppSyncStatus('Sincronizado com o GitHub ✓', 'ok');
+    showScreen(screenApp);
+  } catch (e) {
+    authError.textContent = 'Erro ao conectar: ' + e.message;
+  }
+});
+
+document.getElementById('registerBtn').addEventListener('click', async () => {
+  authError.textContent = '';
+  const username = document.getElementById('authUser').value.trim();
+  const password = document.getElementById('authPass').value;
+  if (!username || !password) { authError.textContent = 'Preencha usuário e senha.'; return; }
+  if (password.length < 4) { authError.textContent = 'Use uma senha com pelo menos 4 caracteres.'; return; }
+  try {
+    const fresh = await ghFetchRemote();
+    remoteData = fresh.data;
+    ghSha = fresh.sha;
+    if (remoteData.users[username]) { authError.textContent = 'Esse usuário já existe. Faça login.'; return; }
+    const salt = randomSalt();
+    const hash = await hashPassword(password, salt);
+    remoteData.users[username] = { salt, hash, entries: [], openEntry: null };
+    saveCache();
+    currentUser = username;
+    entries = [];
+    openEntry = null;
+    await ghSaveCurrentUser();
+    localStorage.setItem(LAST_USER_KEY, username);
+    document.getElementById('authPass').value = '';
+    render();
+    setAppSyncStatus('Sincronizado com o GitHub ✓', 'ok');
+    showScreen(screenApp);
+  } catch (e) {
+    authError.textContent = 'Erro ao criar conta: ' + e.message;
+  }
+});
+
+/* ===================== inicialização ===================== */
+setInterval(() => { liveTime.textContent = new Date().toLocaleTimeString('pt-BR'); }, 1000);
+
+if (ghConfigured(ghConfig)) {
+  connectGithub();
+} else {
+  showScreen(screenGh);
+}
+</script>
+</body>
+</html>
