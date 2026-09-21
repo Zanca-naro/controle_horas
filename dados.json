@@ -1,1 +1,10 @@
-{}
+{
+  "users": {
+    "zancanar": {
+      "salt": "98ad1a709a5dc510fb28a209da23f967",
+      "hash": "f101f340aafce822f3f781290f5617fc45a64383ade66e205bbc9c3f7178393e",
+      "entries": [],
+      "openEntry": null
+    }
+  }
+}
